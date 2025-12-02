@@ -141,6 +141,18 @@ class PaintWidget(QPushButton):
                     shape.move(MOVE_DIST, 0)
             self.update()
 
+        # Change size of all selected
+        elif key == Qt.Key.Key_Minus:
+            for shape in shape_container:
+                if shape.selected:
+                    shape.r -= SCALE_INCREMENT
+            self.update()
+        elif key == Qt.Key.Key_Equal:
+            for shape in shape_container:
+                if shape.selected:
+                    shape.r += SCALE_INCREMENT
+            self.update()
+
         # Delete all selected
         elif key == Qt.Key.Key_Delete:
             shapes_to_delete = []
@@ -228,6 +240,7 @@ class MainWindow(QMainWindow):
 if __name__ == '__main__':
     RADIUS = 70
     MOVE_DIST = 40
+    SCALE_INCREMENT = 10
     shape_container = []
 
     app = QApplication(sys.argv)
