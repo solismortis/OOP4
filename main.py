@@ -28,6 +28,7 @@ class Circle(Shape):
         self.x = x
         self.y = y
         self.r = RADIUS
+        self.color = "#FF0000"  # Red
         self.selected = False
 
     def got_selected(self, x, y):
@@ -66,25 +67,21 @@ class PaintWidget(QPushButton):
         super().__init__(parent=parent)
         self.setMinimumSize(500, 500)
         self.setSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.MinimumExpanding)
-        self.intersect_select = False
         self.ctrl_multiple_select = False
 
     def paintEvent(self, event):
         painter = QPainter()
+        pen = QPen()
+        pen.setWidth(5)
         painter.begin(self)
-        red_pen = QPen()
-        red_pen.setWidth(5)
-        red_pen.setColor(Qt.GlobalColor.red)
-        greed_pen = QPen()
-        greed_pen.setWidth(5)
-        greed_pen.setColor(Qt.GlobalColor.green)
 
-        for circle in shape_container:
-            if circle.selected:
-                painter.setPen(greed_pen)
+        for shape in shape_container:
+            if shape.selected:
+                pen.setColor(QColor('#0dff00'))  # Lime
             else:
-                painter.setPen(red_pen)
-            circle.paint(painter)
+                pen.setColor(QColor(shape.color))
+            painter.setPen(pen)
+            shape.paint(painter)
         painter.end()
 
     def mousePressEvent(self, event):
@@ -92,36 +89,21 @@ class PaintWidget(QPushButton):
         x = event.pos().x()
         y = event.pos().y()
         selected = False
-        if not self.intersect_select:
-            for circle in shape_container:
-                if circle.got_selected(x, y):
-                    selected = True
-                    if not self.ctrl_multiple_select:
-                        for other_circle in shape_container:
-                            if other_circle != circle:
-                                other_circle.selected = False
-                    break
-            if selected:
-                print("Selected!")
-            else:
-                # Deselect all and create a new circle
-                for circle in shape_container:
-                    circle.selected = False
-                shape_container.append(Circle(x, y))
-        else: # intersect_select on
-            # Deselect all
-            for circle in shape_container:
-                circle.selected = False
-            for circle in shape_container:
-                if circle.got_selected(x, y):
-                    selected = True
-            if selected:
-                print("Selected!")
-            else:
-                # Deselect all and create a new circle
-                for circle in shape_container:
-                    circle.selected = False
-                shape_container.append(Circle(x, y))
+        for shape in shape_container:
+            if shape.got_selected(x, y):
+                selected = True
+                if not self.ctrl_multiple_select:
+                    for other_shape in shape_container:
+                        if other_shape != shape:
+                            other_shape.selected = False
+                break
+        if selected:
+            print("Selected!")
+        else:
+            # Deselect all and create a new circle
+            for shape in shape_container:
+                shape.selected = False
+            shape_container.append(Circle(x, y))
 
     def resizeEvent(self, event):
         width = self.size().width()
@@ -161,18 +143,15 @@ class PaintWidget(QPushButton):
 
         # Delete all selected
         elif key == Qt.Key.Key_Delete:
-            circles_to_delete = []
-            for circle in shape_container:
-                if circle.selected:
-                    circles_to_delete.append(circle)
-            for circle in circles_to_delete:
-                shape_container.remove(circle)
+            shapes_to_delete = []
+            for shape in shape_container:
+                if shape.selected:
+                    shapes_to_delete.append(shape)
+            for shape in shapes_to_delete:
+                shape_container.remove(shape)
             self.update()
         elif key == Qt.Key.Key_Control:
             self.ctrl_multiple_select = True
-        elif key == Qt.Key.Key_Z:
-            self.intersect_select = not self.intersect_select
-            self.parent.intersect_select_label.setText(f"Intersect select mode: {self.intersect_select}")
 
     def keyReleaseEvent(self, event):
         # Get the key code of the pressed key
@@ -190,16 +169,17 @@ class CentralWidget(QWidget):
 
         # Info label
         self.info_label = QLabel("Hold CTRL to select multiple\n"
-                                 "Press Z to switch to intersect select\n"
+                                 "Use ARROWS to move objects\n"
                                  "Press DELETE to delete selected")
         self.main_layout.addWidget(self.info_label)
 
-        # Paint event
+        # Paint
         self.paint_button = PaintWidget(parent=self)
         self.main_layout.addWidget(self.paint_button)
 
-        self.intersect_select_label = QLabel(f"Intersect select mode: {self.paint_button.intersect_select}")
-        self.main_layout.addWidget(self.intersect_select_label)
+        # Mode label
+        self.mode_label = QLabel(parent=self, text='Current mode: ')
+        self.main_layout.addWidget(self.mode_label)
 
         # Resize event
         self.resize_label = QLabel("Paint Widget size: ")
@@ -208,33 +188,48 @@ class CentralWidget(QWidget):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__(parent=None)
-        self.setWindowTitle("OOP lab 3 1")
+        self.setWindowTitle("OOP lab 4")
         self.setCentralWidget(CentralWidget(parent=self))
         self.create_menu()
-        self.create_tool_bar()
+        self.create_creation_toolbar()
+        self.create_editing_toolbar()
 
     def create_menu(self):
         # Don't know what should go here. Save, load and exit?
         menu = self.menuBar().addMenu("Menu")
         menu.addAction("Exit", self.close)
 
-    def create_tool_bar(self):
-        tools = QToolBar()
-        tools.addAction("Ellipse")
-        tools.addAction("Circle")
-        tools.addAction("Section")
-        tools.addAction("Rectangle")
-        tools.addAction("Square")
-        tools.addAction("Triangle")
-        tools.addAction("Exit", self.close)
-        self.addToolBar(tools)
+    def create_creation_toolbar(self):
+        creationg_toolbar = QToolBar()
+        creationg_toolbar.setStyleSheet("background-color: #537278; border: none;")
+        creationg_toolbar.addWidget(QLabel('Creation:'))
+        creationg_toolbar.addAction("Ellipse")
+        creationg_toolbar.addAction("Circle")
+        creationg_toolbar.addAction("Section")
+        creationg_toolbar.addAction("Rectangle")
+        creationg_toolbar.addAction("Square")
+        creationg_toolbar.addAction("Triangle")
+        self.addToolBar(creationg_toolbar)
+
+    def create_editing_toolbar(self):
+        editing_toolbar = QToolBar()
+        editing_toolbar.setStyleSheet("background-color: #292F36; border: none;")
+        editing_toolbar.addWidget(QLabel('Editing:'))
+        editing_toolbar.addAction('Color', self.change_color)
+        self.addToolBar(editing_toolbar)
+
+    def change_color(self):
+        color = QColorDialog.getColor()
+        for shape in shape_container:
+            if shape.selected:
+                shape.color = color
 
 
 if __name__ == '__main__':
     RADIUS = 70
     MOVE_DIST = 40
-
     shape_container = []
+
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
