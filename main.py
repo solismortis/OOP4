@@ -5,6 +5,7 @@ from PyQt6 import QtCore
 from PyQt6.QtCore import Qt, QPoint, QSize
 from PyQt6.QtGui import QBrush, QColor, QPainter, QPixmap, QMouseEvent, QPen
 from PyQt6.QtWidgets import (QApplication,
+                             QColorDialog,
                              QLabel,
                              QMainWindow,
                              QPushButton,
@@ -34,6 +35,10 @@ class Circle(Shape):
             self.selected = True
             return True
         return False
+
+    def move(self, dx, dy):
+        self.x += dx
+        self.y += dy
 
     def paint(self, painter):
         painter.drawEllipse(QPoint(self.x, self.y), self.r, self.r)
@@ -74,7 +79,7 @@ class PaintWidget(QPushButton):
         greed_pen.setWidth(5)
         greed_pen.setColor(Qt.GlobalColor.green)
 
-        for circle in circle_container:
+        for circle in shape_container:
             if circle.selected:
                 painter.setPen(greed_pen)
             else:
@@ -88,11 +93,11 @@ class PaintWidget(QPushButton):
         y = event.pos().y()
         selected = False
         if not self.intersect_select:
-            for circle in circle_container:
+            for circle in shape_container:
                 if circle.got_selected(x, y):
                     selected = True
                     if not self.ctrl_multiple_select:
-                        for other_circle in circle_container:
+                        for other_circle in shape_container:
                             if other_circle != circle:
                                 other_circle.selected = False
                     break
@@ -100,23 +105,23 @@ class PaintWidget(QPushButton):
                 print("Selected!")
             else:
                 # Deselect all and create a new circle
-                for circle in circle_container:
+                for circle in shape_container:
                     circle.selected = False
-                circle_container.append(Circle(x, y))
+                shape_container.append(Circle(x, y))
         else: # intersect_select on
             # Deselect all
-            for circle in circle_container:
+            for circle in shape_container:
                 circle.selected = False
-            for circle in circle_container:
+            for circle in shape_container:
                 if circle.got_selected(x, y):
                     selected = True
             if selected:
                 print("Selected!")
             else:
                 # Deselect all and create a new circle
-                for circle in circle_container:
+                for circle in shape_container:
                     circle.selected = False
-                circle_container.append(Circle(x, y))
+                shape_container.append(Circle(x, y))
 
     def resizeEvent(self, event):
         width = self.size().width()
@@ -132,14 +137,36 @@ class PaintWidget(QPushButton):
 
         print(f"Key pressed: {key_text}")
 
+        # Move all selected
+        if key == Qt.Key.Key_Up:
+            for shape in shape_container:
+                if shape.selected:
+                    shape.move(0, -MOVE_DIST)
+            self.update()
+        elif key == Qt.Key.Key_Down:
+            for shape in shape_container:
+                if shape.selected:
+                    shape.move(0, MOVE_DIST)
+            self.update()
+        elif key == Qt.Key.Key_Left:
+            for shape in shape_container:
+                if shape.selected:
+                    shape.move(-MOVE_DIST, 0)
+            self.update()
+        elif key == Qt.Key.Key_Right:
+            for shape in shape_container:
+                if shape.selected:
+                    shape.move(MOVE_DIST, 0)
+            self.update()
+
         # Delete all selected
-        if key == Qt.Key.Key_Delete:
+        elif key == Qt.Key.Key_Delete:
             circles_to_delete = []
-            for circle in circle_container:
+            for circle in shape_container:
                 if circle.selected:
                     circles_to_delete.append(circle)
             for circle in circles_to_delete:
-                circle_container.remove(circle)
+                shape_container.remove(circle)
             self.update()
         elif key == Qt.Key.Key_Control:
             self.ctrl_multiple_select = True
@@ -205,8 +232,9 @@ class MainWindow(QMainWindow):
 
 if __name__ == '__main__':
     RADIUS = 70
+    MOVE_DIST = 40
 
-    circle_container = []
+    shape_container = []
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
