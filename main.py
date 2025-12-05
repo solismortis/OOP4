@@ -1,3 +1,4 @@
+import math
 import sys
 from functools import partial
 
@@ -16,37 +17,92 @@ from PyQt6.QtWidgets import (QApplication,
 
 
 class Shape:
-    ...
-
-
-class Ellipse(Shape):
-    ...
-
-
-class Circle(Shape):
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-        self.r = RADIUS
+    def __init__(self, center_x, center_y):
+        self.center_x = center_x
+        self.center_y = center_y
         self.color = "#FF0000"  # Red
         self.selected = False
 
     def got_selected(self, x, y):
-        if ((x - self.x) ** 2 + (y - self.y) ** 2) ** 0.5 <= RADIUS:
+        if ((x - self.center_x) ** 2 + (y - self.center_y) ** 2) ** 0.5 <= RADIUS:
             self.selected = True
             return True
         return False
 
     def move(self, dx, dy):
-        self.x += dx
-        self.y += dy
+        self.center_x += dx
+        self.center_y += dy
+
+
+class Ellipse(Shape):
+    def __init__(self, center_x, center_y):
+        super().__init__(center_x, center_y)
+        self.r1 = RADIUS + 20
+        self.r2 = RADIUS - 20
 
     def paint(self, painter):
-        painter.drawEllipse(QPoint(self.x, self.y), self.r, self.r)
+        painter.drawEllipse(QPoint(self.center_x, self.center_y), self.r1, self.r2)
+
+    def resize(self, ds):
+        self.r1 += ds
+        self.r2 += ds
+
+
+class Circle(Shape):
+    def __init__(self, center_x, center_y):
+        super().__init__(center_x, center_y)
+        self.r = RADIUS
+
+    def got_selected(self, x, y):
+        if ((x - self.center_x) ** 2 + (y - self.center_y) ** 2) ** 0.5 <= RADIUS:
+            self.selected = True
+            return True
+        return False
+
+    def paint(self, painter):
+        painter.drawEllipse(QPoint(self.center_x, self.center_y), self.r, self.r)
+
+    def resize(self, ds):
+        self.r += ds
+
+class Point(Shape):
+    pass
 
 
 class Section(Shape):
-    ...
+    def __init__(self, center_x, center_y, p1, p2):
+        super().__init__(center_x, center_y)
+        self.p1 = p1
+        self.p2 = p2
+
+    def move(self, dx, dy):
+        self.p1.move(dx, dy)
+        self.p2.move(dx, dy)
+        self.center_x += dx
+        self.center_y += dy
+
+    def paint(self, painter):
+        painter.drawLine(self.p1.center_x, self.p1.center_y, self.p2.center_x, self.p2.center_y)
+
+    def resize(self, ds):
+        r = ((self.center_x - self.p1.center_x) ** 2 + (self.center_y - self.p1.center_y) ** 2) ** 0.5
+        r *= 1.5
+        for p in (self.p1, self.p2):
+            diff_x = p.center_x - self.center_x
+            diff_y = p.center_y - self.center_y
+            a = math.atan(diff_y / diff_x)
+            if diff_x > 0:
+                if diff_y > 0:  # Q1
+                    pass
+                else:  # Q4
+                    ...
+
+            else:
+                if diff_y > 0:  # Q2
+                    ...
+                else:  # Q3
+                    ...
+
 
 
 class Rectangle(Shape):
@@ -63,10 +119,11 @@ class Triangle(Shape):
 
 class PaintWidget(QPushButton):
     def __init__(self, parent):
-        self.parent = parent
         super().__init__(parent=parent)
+        self.parent = parent
         self.setMinimumSize(500, 500)
         self.setSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.MinimumExpanding)
+        self.mode = 'Ellipse'
         self.ctrl_multiple_select = False
 
     def paintEvent(self, event):
@@ -85,25 +142,35 @@ class PaintWidget(QPushButton):
         painter.end()
 
     def mousePressEvent(self, event):
-        # print("Pressed!")
         x = event.pos().x()
         y = event.pos().y()
-        selected = False
-        for shape in shape_container:
-            if shape.got_selected(x, y):
-                selected = True
-                if not self.ctrl_multiple_select:
-                    for other_shape in shape_container:
-                        if other_shape != shape:
-                            other_shape.selected = False
-                break
-        if selected:
-            print("Selected!")
-        else:
-            # Deselect all and create a new circle
+        if self.mode == 'Select':
+            selected = False
+            for shape in shape_container:
+                if shape.got_selected(x, y):
+                    selected = True
+                    if not self.ctrl_multiple_select:
+                        for other_shape in shape_container:
+                            if other_shape != shape:
+                                other_shape.selected = False
+                    break
+            if selected:
+                print("Selected!")
+        else:  # Create
+            # Deselect all
             for shape in shape_container:
                 shape.selected = False
-            shape_container.append(Circle(x, y))
+            # Add shape
+            if self.mode == 'Ellipse':
+                shape_container.append(Ellipse(x, y))
+                self.parent.parent.set_mode('Select')
+            elif self.mode == 'Circle':
+                shape_container.append(Circle(x, y))
+                self.parent.parent.set_mode('Select')
+            elif self.mode == 'Section':
+                shape_container.append(Section(x, y,
+                    Point(x-50, y-50), Point(x+50, y+50)))
+                self.parent.parent.set_mode('Select')
 
     def resizeEvent(self, event):
         width = self.size().width()
@@ -145,12 +212,12 @@ class PaintWidget(QPushButton):
         elif key == Qt.Key.Key_Minus:
             for shape in shape_container:
                 if shape.selected:
-                    shape.r -= SCALE_INCREMENT
+                    shape.resize(-SCALE_INCREMENT)
             self.update()
         elif key == Qt.Key.Key_Equal:
             for shape in shape_container:
                 if shape.selected:
-                    shape.r += SCALE_INCREMENT
+                    shape.resize(SCALE_INCREMENT)
             self.update()
 
         # Delete all selected
@@ -190,7 +257,7 @@ class CentralWidget(QWidget):
         self.main_layout.addWidget(self.paint_button)
 
         # Mode label
-        self.mode_label = QLabel(parent=self, text='Current mode: ')
+        self.mode_label = QLabel(parent=self, text=f'Current mode: {self.paint_button.mode}')
         self.main_layout.addWidget(self.mode_label)
 
         # Resize event
@@ -201,7 +268,8 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__(parent=None)
         self.setWindowTitle("OOP lab 4")
-        self.setCentralWidget(CentralWidget(parent=self))
+        self.central_widget = CentralWidget(parent=self)
+        self.setCentralWidget(self.central_widget)
         self.create_menu()
         self.create_creation_toolbar()
         self.create_editing_toolbar()
@@ -215,18 +283,23 @@ class MainWindow(QMainWindow):
         creationg_toolbar = QToolBar()
         creationg_toolbar.setStyleSheet("background-color: #537278; border: none;")
         creationg_toolbar.addWidget(QLabel('Creation:'))
-        creationg_toolbar.addAction("Ellipse")
-        creationg_toolbar.addAction("Circle")
-        creationg_toolbar.addAction("Section")
-        creationg_toolbar.addAction("Rectangle")
-        creationg_toolbar.addAction("Square")
-        creationg_toolbar.addAction("Triangle")
+        creationg_toolbar.addAction("Ellipse", partial(self.set_mode, 'Ellipse'))
+        creationg_toolbar.addAction("Circle", partial(self.set_mode, 'Circle'))
+        creationg_toolbar.addAction("Section", partial(self.set_mode, 'Section'))
+        creationg_toolbar.addAction("Rectangle", partial(self.set_mode, 'Rectangle'))
+        creationg_toolbar.addAction("Square", partial(self.set_mode, 'Square'))
+        creationg_toolbar.addAction("Triangle", partial(self.set_mode, 'Triangle'))
         self.addToolBar(creationg_toolbar)
+
+    def set_mode(self, mode):
+        self.central_widget.paint_button.mode = mode
+        self.central_widget.mode_label.setText(f'Current mode: {mode}')
 
     def create_editing_toolbar(self):
         editing_toolbar = QToolBar()
         editing_toolbar.setStyleSheet("background-color: #292F36; border: none;")
         editing_toolbar.addWidget(QLabel('Editing:'))
+        editing_toolbar.addAction('Select', partial(self.set_mode, 'Select'))
         editing_toolbar.addAction('Color', self.change_color)
         self.addToolBar(editing_toolbar)
 
