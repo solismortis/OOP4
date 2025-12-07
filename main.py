@@ -35,86 +35,119 @@ class Shape:
 
 
 class Ellipse(Shape):
-    def __init__(self, center_x, center_y):
+    def __init__(self, center_x, center_y, r1=None, r2=None):
         super().__init__(center_x, center_y)
-        self.r1 = RADIUS + 20
-        self.r2 = RADIUS - 20
+        if r1:
+            if r2:  # ellipse
+                self.r1 = r1
+                self.r2 = r2
+            else:  # Circle
+                self.r1 = RADIUS
+                self.r2 = RADIUS
+        else:
+            # Default ellipse
+            self.r1 = RADIUS + 20
+            self.r2 = RADIUS - 20
 
     def paint(self, painter):
         painter.drawEllipse(QPoint(self.center_x, self.center_y), self.r1, self.r2)
 
     def resize(self, ds):
+        # ds too small for ellipse
+        if ds > 0:
+            ds += 30
+        else:
+            ds -= 30
         self.r1 += ds
         self.r2 += ds
 
 
-class Circle(Shape):
-    def __init__(self, center_x, center_y):
-        super().__init__(center_x, center_y)
-        self.r = RADIUS
-
-    def got_selected(self, x, y):
-        if ((x - self.center_x) ** 2 + (y - self.center_y) ** 2) ** 0.5 <= RADIUS:
-            self.selected = True
-            return True
-        return False
-
-    def paint(self, painter):
-        painter.drawEllipse(QPoint(self.center_x, self.center_y), self.r, self.r)
-
-    def resize(self, ds):
-        self.r += ds
+class Circle(Ellipse):
+    pass
 
 class Point(Shape):
     pass
 
 
-class Section(Shape):
-    def __init__(self, center_x, center_y, p1, p2):
+class ConnectedPointGroup(Shape):
+    def __init__(self, center_x, center_y, points: list[Point]):
         super().__init__(center_x, center_y)
-        self.p1 = p1
-        self.p2 = p2
+        self.points = points
 
     def move(self, dx, dy):
-        self.p1.move(dx, dy)
-        self.p2.move(dx, dy)
         self.center_x += dx
         self.center_y += dy
+        for point in self.points:
+            point.move(dx, dy)
 
     def paint(self, painter):
-        painter.drawLine(self.p1.center_x, self.p1.center_y, self.p2.center_x, self.p2.center_y)
+        point0 = self.points[0]
+        for point1 in self.points[1:]:
+            painter.drawLine(point0.center_x, point0.center_y, point1.center_x, point1.center_y)
+            point0 = point1
+        # Connect 0th and last points
+        painter.drawLine(self.points[0].center_x,
+                         self.points[0].center_y,
+                         self.points[-1].center_x,
+                         self.points[-1].center_y)
 
     def resize(self, ds):
-        r = ((self.center_x - self.p1.center_x) ** 2 + (self.center_y - self.p1.center_y) ** 2) ** 0.5
-        r *= 1.5
-        for p in (self.p1, self.p2):
-            diff_x = p.center_x - self.center_x
-            diff_y = p.center_y - self.center_y
-            a = math.atan(diff_y / diff_x)
-            if diff_x > 0:
-                if diff_y > 0:  # Q1
-                    pass
-                else:  # Q4
-                    ...
+        if ds < 0:
+            ds = 1 / abs(ds)
 
+        for point in self.points:
+            # Calculate vector from center to point
+            vector_x = point.center_x - self.center_x
+            vector_y = point.center_y - self.center_y
+
+            # Scale the vector
+            vector_x *= ds
+            vector_y *= ds
+
+            # Calculate new position. We have to int() because PyQT doesn't want float for coords
+            point.center_x = int(self.center_x + vector_x)
+            point.center_y = int(self.center_y + vector_y)
+
+
+class Section(ConnectedPointGroup):
+    # Make sure there are 2 points
+    def __init__(self, center_x: int, center_y: int, points: list[Point]=None):
+        if points:
+            if len(points) != 2:
+                raise ValueError('Section can only have 2 points')
             else:
-                if diff_y > 0:  # Q2
-                    ...
-                else:  # Q3
-                    ...
+                super().__init__(center_x, center_y, points)
+        else:  # Default points
+            super().__init__(center_x, center_y,
+                             [Point(center_x-50, center_y-50),
+                              Point(center_x+50, center_y+50)])
+
+
+class Rectangle(ConnectedPointGroup):
+    # Make sure there are 4 points
+    def __init__(self, center_x: int, center_y: int, points: list[Point]=None):
+        if points:
+            if len(points) != 4:
+                raise ValueError('Section can only have 2 points')
+            else:
+                super().__init__(center_x, center_y, points)
+        else:  # Default points
+            super().__init__(center_x, center_y,
+                             [Point(center_x-100, center_y-50),
+                              Point(center_x-100, center_y+50),
+                              Point(center_x+100, center_y+50),
+                              Point(center_x+100, center_y-50)])
 
 
 
-class Rectangle(Shape):
-    ...
-
-
-class Square(Shape):
-    ...
-
-
-class Triangle(Shape):
-    ...
+class Square(Rectangle):
+    def __init__(self, center_x, center_y, points=None):
+        if not points:  # Default points
+            super().__init__(center_x, center_y,
+                             [Point(center_x-50, center_y-50),
+                              Point(center_x-50, center_y+50),
+                              Point(center_x+50, center_y+50),
+                              Point(center_x+50, center_y-50)])
 
 
 class PaintWidget(QPushButton):
@@ -156,6 +189,9 @@ class PaintWidget(QPushButton):
                     break
             if selected:
                 print("Selected!")
+            else:  # Deselect all
+                for shape in shape_container:
+                    shape.selected = False
         else:  # Create
             # Deselect all
             for shape in shape_container:
@@ -165,11 +201,16 @@ class PaintWidget(QPushButton):
                 shape_container.append(Ellipse(x, y))
                 self.parent.parent.set_mode('Select')
             elif self.mode == 'Circle':
-                shape_container.append(Circle(x, y))
+                shape_container.append(Circle(x, y, RADIUS))
                 self.parent.parent.set_mode('Select')
             elif self.mode == 'Section':
-                shape_container.append(Section(x, y,
-                    Point(x-50, y-50), Point(x+50, y+50)))
+                shape_container.append(Section(x, y))
+                self.parent.parent.set_mode('Select')
+            elif self.mode == 'Rectangle':
+                shape_container.append(Rectangle(x, y))
+                self.parent.parent.set_mode('Select')
+            elif self.mode == 'Square':
+                shape_container.append(Square(x, y))
                 self.parent.parent.set_mode('Select')
 
     def resizeEvent(self, event):
@@ -288,7 +329,6 @@ class MainWindow(QMainWindow):
         creationg_toolbar.addAction("Section", partial(self.set_mode, 'Section'))
         creationg_toolbar.addAction("Rectangle", partial(self.set_mode, 'Rectangle'))
         creationg_toolbar.addAction("Square", partial(self.set_mode, 'Square'))
-        creationg_toolbar.addAction("Triangle", partial(self.set_mode, 'Triangle'))
         self.addToolBar(creationg_toolbar)
 
     def set_mode(self, mode):
@@ -313,7 +353,7 @@ class MainWindow(QMainWindow):
 if __name__ == '__main__':
     RADIUS = 70
     MOVE_DIST = 40
-    SCALE_INCREMENT = 10
+    SCALE_INCREMENT = 2
     shape_container = []
 
     app = QApplication(sys.argv)
