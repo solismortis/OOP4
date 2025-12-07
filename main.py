@@ -38,7 +38,7 @@ class Ellipse(Shape):
     def __init__(self, center_x, center_y, r1=None, r2=None):
         super().__init__(center_x, center_y)
         if r1:
-            if r2:  # ellipse
+            if r2:  # Ellipse
                 self.r1 = r1
                 self.r2 = r2
             else:  # Circle
@@ -49,15 +49,43 @@ class Ellipse(Shape):
             self.r1 = RADIUS + 20
             self.r2 = RADIUS - 20
 
+    def move(self, dx, dy, widget_width=None, widget_height=None):
+        new_center_x = self.center_x + dx
+        new_center_y = self.center_y + dy
+        # Check left and top
+        if new_center_x - self.r1 < 0 \
+        or new_center_y - self.r2 < 0:
+            return
+        # Check right and bottom
+        if new_center_x + self.r1 > widget_width \
+        or new_center_y + self.r2 > widget_height:
+            return
+
+        self.center_x += dx
+        self.center_y += dy
+
     def paint(self, painter):
         painter.drawEllipse(QPoint(self.center_x, self.center_y), self.r1, self.r2)
 
-    def resize(self, ds):
+    def resize(self, ds, widget_width=None, widget_height=None):
         # ds too small for ellipse
         if ds > 0:
             ds += 30
         else:
             ds -= 30
+        # Check borders
+        if ds < 0:
+            pass  # No need to check borders
+        else:
+            new_r1 = self.r1 + ds
+            new_r2 = self.r2 + ds
+            # Check left and top
+            if self.center_x < new_r1 or self.center_y < new_r2:
+                return
+            # Check right and bottom
+            if self.center_x + new_r1 > widget_width \
+            or self.center_y + new_r2 > widget_height:
+                return
         self.r1 += ds
         self.r2 += ds
 
@@ -231,22 +259,30 @@ class PaintWidget(QPushButton):
         if key == Qt.Key.Key_Up:
             for shape in shape_container:
                 if shape.selected:
-                    shape.move(0, -MOVE_DIST)
+                    shape.move(0, -MOVE_DIST,
+                               self.size().width(),
+                               self.size().height())
             self.update()
         elif key == Qt.Key.Key_Down:
             for shape in shape_container:
                 if shape.selected:
-                    shape.move(0, MOVE_DIST)
+                    shape.move(0, MOVE_DIST,
+                               self.size().width(),
+                               self.size().height())
             self.update()
         elif key == Qt.Key.Key_Left:
             for shape in shape_container:
                 if shape.selected:
-                    shape.move(-MOVE_DIST, 0)
+                    shape.move(-MOVE_DIST, 0,
+                               self.size().width(),
+                               self.size().height())
             self.update()
         elif key == Qt.Key.Key_Right:
             for shape in shape_container:
                 if shape.selected:
-                    shape.move(MOVE_DIST, 0)
+                    shape.move(MOVE_DIST, 0,
+                               self.size().width(),
+                               self.size().height())
             self.update()
 
         # Change size of all selected
@@ -258,7 +294,9 @@ class PaintWidget(QPushButton):
         elif key == Qt.Key.Key_Equal:
             for shape in shape_container:
                 if shape.selected:
-                    shape.resize(SCALE_INCREMENT)
+                    shape.resize(SCALE_INCREMENT,
+                                 self.size().width(),
+                                 self.size().height())
             self.update()
 
         # Delete all selected
