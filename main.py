@@ -29,7 +29,7 @@ class Shape:
             return True
         return False
 
-    def move(self, dx, dy):
+    def move(self, dx, dy, widget_width, widget_height):
         self.center_x += dx
         self.center_y += dy
 
@@ -102,11 +102,26 @@ class ConnectedPointGroup(Shape):
         super().__init__(center_x, center_y)
         self.points = points
 
-    def move(self, dx, dy):
+    def move(self, dx, dy, widget_width, widget_height):
+        # Check points for borders
+        for point in self.points:
+            # Left
+            if dx < 0 and point.center_x + dx < 0:
+                return
+            # Right
+            elif point.center_x + dx > widget_width:
+                return
+            # Top
+            if dy < 0 and point.center_y + dy < 0:
+                return
+            # Bottom
+            elif point.center_y + dy > widget_height:
+                return
+
         self.center_x += dx
         self.center_y += dy
         for point in self.points:
-            point.move(dx, dy)
+            point.move(dx, dy, widget_width, widget_height)
 
     def paint(self, painter):
         point0 = self.points[0]
