@@ -134,9 +134,25 @@ class ConnectedPointGroup(Shape):
                          self.points[-1].center_x,
                          self.points[-1].center_y)
 
-    def resize(self, ds):
+    def resize(self, ds, widget_width, widget_height):
         if ds < 0:
             ds = 1 / abs(ds)
+        # Check borders
+        for point in self.points:
+            # Calculate vector from center to point
+            vector_x = point.center_x - self.center_x
+            vector_y = point.center_y - self.center_y
+
+            # Scale the vector
+            vector_x *= ds
+            vector_y *= ds
+
+            # Calculate new position
+            new_center_x = int(self.center_x + vector_x)
+            new_center_y = int(self.center_y + vector_y)
+            if new_center_x < 0 or new_center_y < 0 \
+            or new_center_x > widget_width or new_center_y > widget_height:
+                return
 
         for point in self.points:
             # Calculate vector from center to point
@@ -304,7 +320,9 @@ class PaintWidget(QPushButton):
         elif key == Qt.Key.Key_Minus:
             for shape in shape_container:
                 if shape.selected:
-                    shape.resize(-SCALE_INCREMENT)
+                    shape.resize(-SCALE_INCREMENT,
+                                 self.size().width(),
+                                 self.size().height())
             self.update()
         elif key == Qt.Key.Key_Equal:
             for shape in shape_container:
@@ -343,6 +361,7 @@ class CentralWidget(QWidget):
         # Info label
         self.info_label = QLabel("Hold CTRL to select multiple\n"
                                  "Use ARROWS to move objects\n"
+                                 "Use - and = to resize objects\n"
                                  "Press DELETE to delete selected")
         self.main_layout.addWidget(self.info_label)
 
@@ -390,7 +409,7 @@ class MainWindow(QMainWindow):
 
     def create_editing_toolbar(self):
         editing_toolbar = QToolBar()
-        editing_toolbar.setStyleSheet("background-color: #292F36; border: none;")
+        editing_toolbar.setStyleSheet("background-color: #537278; border: none;")
         editing_toolbar.addWidget(QLabel('Editing:'))
         editing_toolbar.addAction('Select', partial(self.set_mode, 'Select'))
         editing_toolbar.addAction('Color', self.change_color)
