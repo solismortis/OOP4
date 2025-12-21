@@ -1,5 +1,3 @@
-# TODO: Выделение
-
 import math
 import sys
 from functools import partial
@@ -25,12 +23,6 @@ class Shape:
         self.color = "#FF0000"  # Red
         self.selected = False
 
-    def got_selected(self, x, y):
-        if ((x - self.center_x) ** 2 + (y - self.center_y) ** 2) ** 0.5 <= RADIUS:
-            self.selected = True
-            return True
-        return False
-
     def move(self, dx, dy, widget_width, widget_height):
         self.center_x += dx
         self.center_y += dy
@@ -50,6 +42,13 @@ class Ellipse(Shape):
             # Default ellipse
             self.r1 = RADIUS + 20
             self.r2 = RADIUS - 20
+
+    def got_selected(self, x, y):
+        if ((x-self.center_x)/self.r1)**2 \
+            + ((y-self.center_y)/self.r2)**2 <= 1:
+            self.selected = True
+            return True
+        return False
 
     def move(self, dx, dy, widget_width=None, widget_height=None):
         new_center_x = self.center_x + dx
@@ -172,6 +171,11 @@ class ConnectedPointGroup(Shape):
 
 class Rectangle(ConnectedPointGroup):
     # Make sure there are 4 points
+
+    def set_width_and_height(self):
+        self.width = self.points[2].center_x - self.points[0].center_x
+        self.height = self.points[1].center_y - self.points[0].center_y
+
     def __init__(self, center_x: int, center_y: int, points: list[Point]=None):
         if points:
             if len(points) != 4:
@@ -184,8 +188,18 @@ class Rectangle(ConnectedPointGroup):
                               Point(center_x-100, center_y+50),
                               Point(center_x+100, center_y+50),
                               Point(center_x+100, center_y-50)])
+        self.set_width_and_height()
 
+    def got_selected(self, x, y):
+        if self.center_x - self.width/2 <= x <= self.center_x + self.width/2 \
+            and self.center_y - self.height/2 <= y <= self.center_y + self.height/2:
+            self.selected = True
+            return True
+        return False
 
+    def resize(self, ds, widget_width, widget_height):
+        super().resize(ds, widget_width, widget_height)
+        self.set_width_and_height()
 
 class Square(Rectangle):
     def __init__(self, center_x, center_y, points=None):
@@ -205,6 +219,7 @@ class PaintWidget(QPushButton):
         self.setSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.MinimumExpanding)
         self.mode = 'Ellipse'
         self.ctrl_multiple_select = False
+        self.intersect_select = False
 
     def paintEvent(self, event):
         painter = QPainter()
@@ -225,21 +240,35 @@ class PaintWidget(QPushButton):
         x = event.pos().x()
         y = event.pos().y()
         if self.mode == 'Select':
-            selected = False
-            for shape in shape_container:
-                if shape.got_selected(x, y):
-                    selected = True
-                    if not self.ctrl_multiple_select:
-                        for other_shape in shape_container:
-                            if other_shape != shape:
-                                other_shape.selected = False
-                    break
-            if selected:
-                print("Selected!")
-            else:  # Deselect all
+            if not self.intersect_select:
+                selected = False
                 for shape in shape_container:
-                    shape.selected = False
-        else:  # Create
+                    if shape.got_selected(x, y):
+                        selected = True
+                        if not self.ctrl_multiple_select:
+                            for other_shape in shape_container:
+                                if other_shape != shape:
+                                    other_shape.selected = False
+                        break
+                if selected:
+                    print("Selected!")
+                else:  # Nothing selected, deselect all
+                    for shape in shape_container:
+                        shape.selected = False
+            else:  # intersect_select
+                selected = False
+                if not self.ctrl_multiple_select:
+                    for shape in shape_container:
+                        shape.selected = False
+                for shape in shape_container:
+                    if shape.got_selected(x, y):
+                        selected = True
+                if selected:
+                    print("Selected!")
+                else:  # Nothing selected, deselect all
+                    for shape in shape_container:
+                        shape.selected = False
+        else:  # Modes other than "select"
             # Deselect all
             for shape in shape_container:
                 shape.selected = False
@@ -328,6 +357,9 @@ class PaintWidget(QPushButton):
             self.update()
         elif key == Qt.Key.Key_Control:
             self.ctrl_multiple_select = True
+        elif key == Qt.Key.Key_Z:
+            self.intersect_select = not self.intersect_select
+            self.parent.intersect_select_label.setText(f"Intersect select mode: {self.intersect_select}")
 
     def keyReleaseEvent(self, event):
         # Get the key code of the pressed key
@@ -347,12 +379,17 @@ class CentralWidget(QWidget):
         self.info_label = QLabel("Hold CTRL to select multiple\n"
                                  "Use ARROWS to move objects\n"
                                  "Use - and = to resize objects\n"
-                                 "Press DELETE to delete selected")
+                                 "Press DELETE to delete selected\n"
+                                 "Press Z to change intersect select mode")
         self.main_layout.addWidget(self.info_label)
 
         # Paint
         self.paint_button = PaintWidget(parent=self)
         self.main_layout.addWidget(self.paint_button)
+
+        # Intersect label
+        self.intersect_select_label = QLabel(f"Intersect select mode: {self.paint_button.intersect_select}")
+        self.main_layout.addWidget(self.intersect_select_label)
 
         # Mode label
         self.mode_label = QLabel(parent=self, text=f'Current mode: {self.paint_button.mode}')
