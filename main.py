@@ -1,3 +1,5 @@
+# TODO: Выделение
+
 import math
 import sys
 from functools import partial
@@ -168,26 +170,12 @@ class ConnectedPointGroup(Shape):
             point.center_y = int(self.center_y + vector_y)
 
 
-class Section(ConnectedPointGroup):
-    # Make sure there are 2 points
-    def __init__(self, center_x: int, center_y: int, points: list[Point]=None):
-        if points:
-            if len(points) != 2:
-                raise ValueError('Section can only have 2 points')
-            else:
-                super().__init__(center_x, center_y, points)
-        else:  # Default points
-            super().__init__(center_x, center_y,
-                             [Point(center_x-50, center_y-50),
-                              Point(center_x+50, center_y+50)])
-
-
 class Rectangle(ConnectedPointGroup):
     # Make sure there are 4 points
     def __init__(self, center_x: int, center_y: int, points: list[Point]=None):
         if points:
             if len(points) != 4:
-                raise ValueError('Section can only have 2 points')
+                raise ValueError('Rectangle can only have 4 points')
             else:
                 super().__init__(center_x, center_y, points)
         else:  # Default points
@@ -261,9 +249,6 @@ class PaintWidget(QPushButton):
                 self.parent.parent.set_mode('Select')
             elif self.mode == 'Circle':
                 shape_container.append(Circle(x, y, RADIUS))
-                self.parent.parent.set_mode('Select')
-            elif self.mode == 'Section':
-                shape_container.append(Section(x, y))
                 self.parent.parent.set_mode('Select')
             elif self.mode == 'Rectangle':
                 shape_container.append(Rectangle(x, y))
@@ -398,7 +383,6 @@ class MainWindow(QMainWindow):
         creationg_toolbar.addWidget(QLabel('Creation:'))
         creationg_toolbar.addAction("Ellipse", partial(self.set_mode, 'Ellipse'))
         creationg_toolbar.addAction("Circle", partial(self.set_mode, 'Circle'))
-        creationg_toolbar.addAction("Section", partial(self.set_mode, 'Section'))
         creationg_toolbar.addAction("Rectangle", partial(self.set_mode, 'Rectangle'))
         creationg_toolbar.addAction("Square", partial(self.set_mode, 'Square'))
         self.addToolBar(creationg_toolbar)
